@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard IoT Environment Controller</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="./assets/css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div style="display: flex; align-items: center; justify-content: start">
+          <img src="./assets/images/anonymous-logo.png" alt="logo" style="width: 100px" />
+          <h1>&nbsp;&nbsp;IoT Environment Controller</h1>
+        </div>
+        <div id="connStatus" class="status-badge status-disconnected">● Chưa kết nối</div>
+        <div class="mqtt-connection">
+          <div class="mqtt-input">
+            <label>📧 Email <b style="color: red">(*)</b></label>
+            <input id="mqttUser" type="email" placeholder="email@example.com" required />
+          </div>
+          <div class="mqtt-input">
+            <label>🔑 Password <b style="color: red">(*)</b></label>
+            <input id="mqttPass" type="password" placeholder="password" required />
+          </div>
+          <button class="btn-connect" onclick="connectMQTT()">Kết nối</button>
+        </div>
+      </div>
+
+      <div class="dashboard">
+        <!-- LEFT: Sensors -->
+        <div class="card">
+          <div class="card-title">📊 Cảm biến thời gian thực</div>
+          <div class="sensor-grid">
+            <div class="sensor-card">
+              <div class="sensor-icon">🌡️</div>
+              <div class="sensor-value" id="tempDisplay">--</div>
+              <div class="sensor-label">Nhiệt độ (°C)</div>
+            </div>
+            <div class="sensor-card">
+              <div class="sensor-icon">💧</div>
+              <div class="sensor-value" id="humDisplay">--</div>
+              <div class="sensor-label">Độ ẩm (%)</div>
+            </div>
+            <div class="sensor-card">
+              <div class="sensor-icon">💡</div>
+              <div class="sensor-value" id="lightDisplay">--</div>
+              <div class="sensor-label">Ánh sáng (ADC)</div>
+            </div>
+          </div>
+
+          <div class="control-section">
+            <h4>⚙️ Chế độ tự động</h4>
+            <div class="btn-group">
+              <button id="btnAutoOn" class="btn btn-auto">Bật Auto</button>
+              <button id="btnAutoOff" class="btn btn-neutral">Tắt Auto</button>
+            </div>
+          </div>
+
+          <div class="control-section">
+            <h4>💡 Điều khiển LED</h4>
+            <div class="led-grid">
+              <div class="led-control">
+                <div class="led-name">
+                  <span class="led-indicator led-red"></span>
+                  Hệ thống làm mát (Đèn đỏ)
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-on" onclick="sendControl('RED_ON')">BẬT</button>
+                  <button class="btn btn-off" onclick="sendControl('RED_OFF')">TẮT</button>
+                </div>
+              </div>
+              <div class="led-control">
+                <div class="led-name">
+                  <span class="led-indicator led-yellow"></span>
+                  Hệ thống phun sương (Đèn Vàng)
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-on" onclick="sendControl('YELLOW_ON')">BẬT</button>
+                  <button class="btn btn-off" onclick="sendControl('YELLOW_OFF')">TẮT</button>
+                </div>
+              </div>
+              <div class="led-control">
+                <div class="led-name">
+                  <span class="led-indicator led-green"></span>
+                  Hệ thống đèn (Đèn Xanh)
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-on" onclick="sendControl('GREEN_ON')">BẬT</button>
+                  <button class="btn btn-off" onclick="sendControl('GREEN_OFF')">TẮT</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MIDDLE: Chart & Logs -->
+        <div style="display: flex; flex-direction: column; gap: 20px" class="chart-card">
+          <div class="card">
+            <div class="card-title">📈 Biểu đồ theo thời gian</div>
+            <div class="chart-container">
+              <canvas id="chart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
+              <div class="card-title" style="margin: 0">🔔 Nhật ký & Cảnh báo &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+              <button class="btn btn-neutral" style="padding: 8px 16px" onclick="clearLogs()">Xóa</button>
+            </div>
+            <div id="logs" class="logs-container"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Thresholds & Status -->
+        <div class="card">
+          <div class="card-title">⚡ Cấu hình ngưỡng</div>
+
+          <div class="input-group">
+            <label class="input-label">🌡️ Ngưỡng nhiệt độ (°C)</label>
+            <input type="number" id="thTemp" value="35" step="0.1" />
+          </div>
+
+          <div class="input-group">
+            <label class="input-label">💧 Ngưỡng độ ẩm (%)</label>
+            <input type="number" id="thHum" value="70" step="0.1" />
+          </div>
+
+          <div class="input-group">
+            <label class="input-label">💡 Ngưỡng ánh sáng (ADC)</label>
+            <input type="number" id="thLight" value="300" step="1" />
+          </div>
+
+          <div class="threshold-actions">
+            <button class="btn btn-auto" onclick="sendThresholds()">💾 Lưu</button>
+            <button class="btn btn-warning" onclick="resetThresholds()">↺ Mặc định</button>
+          </div>
+
+          <div style="margin-top: 24px">
+            <h4
+              style="
+                font-size: 0.9rem;
+                color: #94a3b8;
+                margin-bottom: 12px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+              ">
+              📋 Trạng thái hiện tại
+            </h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-item-label">Auto Mode</div>
+                <div class="info-item-value" id="infoAuto">—</div>
+              </div>
+              <div class="info-item">
+                <div class="info-item-label">Nhiệt độ</div>
+                <div class="info-item-value" id="infoT">—</div>
+              </div>
+              <div class="info-item">
+                <div class="info-item-label">Độ ẩm</div>
+                <div class="info-item-value" id="infoH">—</div>
+              </div>
+              <div class="info-item">
+                <div class="info-item-label">Ánh sáng</div>
+                <div class="info-item-value" id="infoL">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./assets/js/main.js"></script>
+  </body>
+</html>
