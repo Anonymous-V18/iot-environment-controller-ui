@@ -6,7 +6,7 @@ const DEFAULT_THRESHOLDS = {
 
 let mqttUser = "";
 let mqttPass = "";
-const brokerURL = "wss://maqiatto.com:8883";
+const brokerURL = "wss://test.mosquitto.org:8081/mqtt";
 
 let topicData = () => `${mqttUser}/iot-env-controller`;
 let topicControl = () => `${mqttUser}/control`;
@@ -138,10 +138,6 @@ function initChart() {
 function connectMQTT() {
   mqttUser = document.getElementById("mqttUser").value.trim();
   mqttPass = document.getElementById("mqttPass").value.trim();
-  if (!mqttUser || !mqttPass) {
-    alert("Vui lòng nhập email và mật khẩu MQTT");
-    return;
-  }
 
   if (client && client.connected) {
     addLog("Đang ngắt kết nối cũ...", "warn");
@@ -152,7 +148,7 @@ function connectMQTT() {
   connStatus.innerText = "● Đang kết nối...";
   connStatus.className = "status-badge status-disconnected";
 
-  const opts = { username: mqttUser, password: mqttPass, reconnectPeriod: 2000 };
+  const opts = { reconnectPeriod: 2000, clean: true };
   client = mqtt.connect(brokerURL, opts);
 
   client.on("connect", () => {
