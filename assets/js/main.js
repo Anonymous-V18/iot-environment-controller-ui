@@ -6,7 +6,7 @@ const DEFAULT_THRESHOLDS = {
 
 let mqttUser = "";
 let mqttPass = "";
-const brokerURL = "https://maqiatto.com:8883";
+const brokerURL = "wss://maqiatto.com:8883";
 
 let topicData = () => `${mqttUser}/iot-env-controller`;
 let topicControl = () => `${mqttUser}/control`;
