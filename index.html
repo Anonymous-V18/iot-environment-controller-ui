@@ -1,177 +1,620 @@
 <!DOCTYPE html>
 <html lang="vi">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard IoT Environment Controller</title>
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="./assets/css/style.css" />
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <div style="display: flex; align-items: center; justify-content: start">
-          <img src="./assets/images/anonymous-logo.png" alt="logo" style="width: 100px" />
-          <h1>&nbsp;&nbsp;IoT Environment Controller</h1>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32 IoT Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      background: linear-gradient(90deg, #00f260, #0575e6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9em;
+      backdrop-filter: blur(10px);
+      animation: pulse 2s infinite;
+    }
+
+    .status.online {
+      background: rgba(0, 230, 118, 0.2);
+      color: #00e676;
+      border: 2px solid #00e676;
+    }
+
+    .status.offline {
+      background: rgba(255, 82, 82, 0.2);
+      color: #ff5252;
+      border: 2px solid #ff5252;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      animation: slideUp 0.8s ease-out;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-size: 1.3em;
+      font-weight: 600;
+    }
+
+    .sensor-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+
+    .sensor-item {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 15px;
+      border-radius: 12px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .sensor-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .sensor-icon {
+      font-size: 2em;
+      margin-bottom: 8px;
+    }
+
+    .sensor-label {
+      font-size: 0.85em;
+      opacity: 0.7;
+      margin-bottom: 5px;
+    }
+
+    .sensor-value {
+      font-size: 1.8em;
+      font-weight: 700;
+      background: linear-gradient(90deg, #00f260, #0575e6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .sensor-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .sensor-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .temp-bar { background: linear-gradient(90deg, #ff416c, #ff4b2b); }
+    .hum-bar { background: linear-gradient(90deg, #2196f3, #00bcd4); }
+    .light-bar { background: linear-gradient(90deg, #ffd54f, #ffb300); }
+
+    .fire-alert {
+      grid-column: 1 / -1;
+      background: rgba(255, 82, 82, 0.1);
+      border: 2px solid #ff5252;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .fire-alert.safe {
+      background: rgba(0, 230, 118, 0.1);
+      border-color: #00e676;
+      color: #00e676;
+    }
+
+    .fire-alert.danger {
+      background: rgba(255, 82, 82, 0.2);
+      border-color: #ff5252;
+      color: #ff5252;
+      animation: blink 1s infinite;
+    }
+
+    .control-section {
+      margin-top: 15px;
+    }
+
+    .threshold-group {
+      margin-bottom: 15px;
+    }
+
+    .threshold-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.9em;
+      opacity: 0.8;
+    }
+
+    .threshold-input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 1em;
+      transition: all 0.3s ease;
+    }
+
+    .threshold-input:focus {
+      outline: none;
+      border-color: #00f260;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .btn {
+      padding: 14px 20px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 0.95em;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-label {
+      font-size: 1em;
+    }
+
+    .btn-state {
+      font-size: 0.75em;
+      opacity: 0.9;
+      font-weight: 500;
+    }
+
+    .btn:before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+      z-index: 0;
+    }
+
+    .btn > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn:active:before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-red {
+      background: linear-gradient(135deg, #ff416c, #ff4b2b);
+      color: #fff;
+    }
+
+    .btn-red.active {
+      background: linear-gradient(135deg, #ff6b8a, #ff7659);
+      box-shadow: 0 0 20px rgba(255, 65, 108, 0.6);
+    }
+
+    .btn-green {
+      background: linear-gradient(135deg, #00e676, #00c853);
+      color: #fff;
+    }
+
+    .btn-green.active {
+      background: linear-gradient(135deg, #33ff99, #00e676);
+      box-shadow: 0 0 20px rgba(0, 230, 118, 0.6);
+    }
+
+    .btn-yellow {
+      background: linear-gradient(135deg, #ffd54f, #ffb300);
+      color: #333;
+    }
+
+    .btn-yellow.active {
+      background: linear-gradient(135deg, #ffed7f, #ffd54f);
+      box-shadow: 0 0 20px rgba(255, 213, 79, 0.6);
+    }
+
+    .btn-buzzer {
+      background: linear-gradient(135deg, #ff5252, #d32f2f);
+      color: #fff;
+      grid-column: 1 / -1;
+    }
+
+    .btn-buzzer.active {
+      background: linear-gradient(135deg, #ff7979, #ff5252);
+      box-shadow: 0 0 20px rgba(255, 82, 82, 0.6);
+      animation: buzz 0.3s infinite;
+    }
+
+    .btn-auto {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      grid-column: 1 / -1;
+    }
+
+    .btn-auto.active {
+      background: linear-gradient(135deg, #8b9cf7, #9d6fc9);
+      box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .btn-save {
+      background: linear-gradient(135deg, #00f260, #0575e6);
+      color: #fff;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    @keyframes blink {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    @keyframes buzz {
+      0%, 100% {
+        transform: translateX(0);
+      }
+      25% {
+        transform: translateX(-2px);
+      }
+      75% {
+        transform: translateX(2px);
+      }
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.8em;
+      }
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+      .btn-group {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚡ ESP32 IoT Dashboard</h1>
+      <div id="connStatus" class="status offline">🔌 Đang kết nối MQTT...</div>
+    </header>
+
+    <div class="dashboard">
+      <!-- Card Cảm biến -->
+      <div class="card">
+        <div class="card-header">
+          <span>📊</span>
+          <span>Dữ liệu Cảm biến</span>
         </div>
-        <div id="connStatus" class="status-badge status-disconnected">● Chưa kết nối</div>
-        <div class="mqtt-connection">
-          <div class="mqtt-input">
-            <label>📧 Email <b style="color: red">(*)</b></label>
-            <input id="mqttUser" type="email" placeholder="email@example.com" required />
+        <div class="sensor-grid">
+          <div class="sensor-item">
+            <div class="sensor-icon">🌡️</div>
+            <div class="sensor-label">Nhiệt độ</div>
+            <div class="sensor-value" id="temp">--</div>
+            <div class="sensor-bar">
+              <div class="sensor-bar-fill temp-bar" id="tempBar" style="width: 0%"></div>
+            </div>
           </div>
-          <div class="mqtt-input">
-            <label>🔑 Password <b style="color: red">(*)</b></label>
-            <input id="mqttPass" type="password" placeholder="password" required />
+          <div class="sensor-item">
+            <div class="sensor-icon">💧</div>
+            <div class="sensor-label">Độ ẩm</div>
+            <div class="sensor-value" id="hum">--</div>
+            <div class="sensor-bar">
+              <div class="sensor-bar-fill hum-bar" id="humBar" style="width: 0%"></div>
+            </div>
           </div>
-          <button class="btn-connect" onclick="connectMQTT()">Kết nối</button>
+          <div class="sensor-item">
+            <div class="sensor-icon">💡</div>
+            <div class="sensor-label">Ánh sáng</div>
+            <div class="sensor-value" id="light">--</div>
+            <div class="sensor-bar">
+              <div class="sensor-bar-fill light-bar" id="lightBar" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="fire-alert safe" id="fireStatus">
+            <span id="fire">✅ An toàn</span>
+          </div>
         </div>
       </div>
 
-      <div class="dashboard">
-        <!-- LEFT: Sensors -->
-        <div class="card">
-          <div class="card-title">📊 Cảm biến thời gian thực</div>
-          <div class="sensor-grid">
-            <div class="sensor-card">
-              <div class="sensor-icon">🌡️</div>
-              <div class="sensor-value" id="tempDisplay">--</div>
-              <div class="sensor-label">Nhiệt độ (°C)</div>
-            </div>
-            <div class="sensor-card">
-              <div class="sensor-icon">💧</div>
-              <div class="sensor-value" id="humDisplay">--</div>
-              <div class="sensor-label">Độ ẩm (%)</div>
-            </div>
-            <div class="sensor-card">
-              <div class="sensor-icon">💡</div>
-              <div class="sensor-value" id="lightDisplay">--</div>
-              <div class="sensor-label">Ánh sáng (ADC)</div>
-            </div>
-          </div>
-
-          <div class="control-section">
-            <h4>⚙️ Chế độ tự động</h4>
-            <div class="btn-group">
-              <button id="btnAutoOn" class="btn btn-auto">Bật Auto</button>
-              <button id="btnAutoOff" class="btn btn-neutral">Tắt Auto</button>
-            </div>
-          </div>
-
-          <div class="control-section">
-            <h4>💡 Điều khiển LED</h4>
-            <div class="led-grid">
-              <div class="led-control">
-                <div class="led-name">
-                  <span class="led-indicator led-red"></span>
-                  Hệ thống làm mát (Đèn đỏ)
-                </div>
-                <div class="btn-group">
-                  <button class="btn btn-on" onclick="sendControl('RED_ON')">BẬT</button>
-                  <button class="btn btn-off" onclick="sendControl('RED_OFF')">TẮT</button>
-                </div>
-              </div>
-              <div class="led-control">
-                <div class="led-name">
-                  <span class="led-indicator led-yellow"></span>
-                  Hệ thống phun sương (Đèn Vàng)
-                </div>
-                <div class="btn-group">
-                  <button class="btn btn-on" onclick="sendControl('YELLOW_ON')">BẬT</button>
-                  <button class="btn btn-off" onclick="sendControl('YELLOW_OFF')">TẮT</button>
-                </div>
-              </div>
-              <div class="led-control">
-                <div class="led-name">
-                  <span class="led-indicator led-green"></span>
-                  Hệ thống đèn (Đèn Xanh)
-                </div>
-                <div class="btn-group">
-                  <button class="btn btn-on" onclick="sendControl('GREEN_ON')">BẬT</button>
-                  <button class="btn btn-off" onclick="sendControl('GREEN_OFF')">TẮT</button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <!-- Card Ngưỡng -->
+      <div class="card">
+        <div class="card-header">
+          <span>⚙️</span>
+          <span>Cài đặt Ngưỡng</span>
         </div>
-
-        <!-- MIDDLE: Chart & Logs -->
-        <div style="display: flex; flex-direction: column; gap: 20px" class="chart-card">
-          <div class="card">
-            <div class="card-title">📈 Biểu đồ theo thời gian</div>
-            <div class="chart-container">
-              <canvas id="chart"></canvas>
-            </div>
+        <div class="control-section">
+          <div class="threshold-group">
+            <label>🌡️ Nhiệt độ tối đa (°C)</label>
+            <input class="threshold-input" id="tempTh" type="number" value="30" />
           </div>
-
-          <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
-              <div class="card-title" style="margin: 0">🔔 Nhật ký & Cảnh báo &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
-              <button class="btn btn-neutral" style="padding: 8px 16px" onclick="clearLogs()">Xóa</button>
-            </div>
-            <div id="logs" class="logs-container"></div>
+          <div class="threshold-group">
+            <label>💧 Độ ẩm tối thiểu (%)</label>
+            <input class="threshold-input" id="humTh" type="number" value="40" />
           </div>
+          <div class="threshold-group">
+            <label>💡 Ánh sáng tối thiểu</label>
+            <input class="threshold-input" id="lightTh" type="number" value="1500" />
+          </div>
+          <button class="btn btn-save" id="saveThreshold">💾 Cập nhật Ngưỡng</button>
         </div>
+      </div>
 
-        <!-- RIGHT: Thresholds & Status -->
-        <div class="card">
-          <div class="card-title">⚡ Cấu hình ngưỡng</div>
-
-          <div class="input-group">
-            <label class="input-label">🌡️ Ngưỡng nhiệt độ (°C)</label>
-            <input type="number" id="thTemp" value="35" step="0.1" />
-          </div>
-
-          <div class="input-group">
-            <label class="input-label">💧 Ngưỡng độ ẩm (%)</label>
-            <input type="number" id="thHum" value="70" step="0.1" />
-          </div>
-
-          <div class="input-group">
-            <label class="input-label">💡 Ngưỡng ánh sáng (ADC)</label>
-            <input type="number" id="thLight" value="300" step="1" />
-          </div>
-
-          <div class="threshold-actions">
-            <button class="btn btn-auto" onclick="sendThresholds()">💾 Lưu</button>
-            <button class="btn btn-warning" onclick="resetThresholds()">↺ Mặc định</button>
-          </div>
-
-          <div style="margin-top: 24px">
-            <h4
-              style="
-                font-size: 0.9rem;
-                color: #94a3b8;
-                margin-bottom: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-              ">
-              📋 Trạng thái hiện tại
-            </h4>
-            <div class="info-grid">
-              <div class="info-item">
-                <div class="info-item-label">Auto Mode</div>
-                <div class="info-item-value" id="infoAuto">—</div>
-              </div>
-              <div class="info-item">
-                <div class="info-item-label">Nhiệt độ</div>
-                <div class="info-item-value" id="infoT">—</div>
-              </div>
-              <div class="info-item">
-                <div class="info-item-label">Độ ẩm</div>
-                <div class="info-item-value" id="infoH">—</div>
-              </div>
-              <div class="info-item">
-                <div class="info-item-label">Ánh sáng</div>
-                <div class="info-item-value" id="infoL">—</div>
-              </div>
-            </div>
-          </div>
+      <!-- Card Điều khiển -->
+      <div class="card">
+        <div class="card-header">
+          <span>🎮</span>
+          <span>Điều khiển Thiết bị</span>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-red" id="red">
+            <span class="btn-label">🔴 Đèn Đỏ</span>
+            <span class="btn-state" id="redState">OFF</span>
+          </button>
+          <button class="btn btn-green" id="green">
+            <span class="btn-label">🟢 Đèn Xanh</span>
+            <span class="btn-state" id="greenState">OFF</span>
+          </button>
+          <button class="btn btn-yellow" id="yellow">
+            <span class="btn-label">🟡 Đèn Vàng</span>
+            <span class="btn-state" id="yellowState">OFF</span>
+          </button>
+          <button class="btn btn-buzzer" id="buzzer">
+            <span class="btn-label">🔊 Còi Báo Động</span>
+            <span class="btn-state" id="buzzerState">OFF</span>
+          </button>
+          <button class="btn btn-auto" id="auto">
+            <span class="btn-label">🔄 Chế độ Tự động</span>
+            <span class="btn-state" id="autoState">OFF</span>
+          </button>
         </div>
       </div>
     </div>
+  </div>
 
-    <script src="./assets/js/main.js"></script>
-  </body>
+  <script>
+    const mqttBroker = "wss://test.mosquitto.org:8081/mqtt";
+    const client = mqtt.connect(mqttBroker);
+    let connected = false;
+    const el = (id) => document.getElementById(id);
+
+    // Trạng thái các thiết bị
+    const deviceStates = {
+      red: false,
+      green: false,
+      yellow: false,
+      buzzer: false,
+      auto: false
+    };
+
+    client.on("connect", () => {
+      connected = true;
+      el("connStatus").textContent = "🟢 Đã kết nối MQTT";
+      el("connStatus").className = "status online";
+      client.subscribe("esp32/envMonitor");
+      client.subscribe("esp32/deviceStatus"); // Subscribe để nhận trạng thái thiết bị
+    });
+
+    client.on("message", (topic, msg) => {
+      try {
+        const data = JSON.parse(msg.toString());
+        
+        if (topic === "esp32/envMonitor") {
+          updateReadings(data);
+        } else if (topic === "esp32/deviceStatus") {
+          updateDeviceStates(data);
+        }
+      } catch (e) {
+        console.error("JSON error:", e);
+      }
+    });
+
+    function updateReadings(data) {
+      if (data.temp !== undefined) {
+        el("temp").textContent = data.temp.toFixed(1) + "°C";
+        el("tempBar").style.width = Math.min((data.temp / 50) * 100, 100) + "%";
+      }
+      if (data.hum !== undefined) {
+        el("hum").textContent = data.hum.toFixed(1) + "%";
+        el("humBar").style.width = data.hum + "%";
+      }
+      if (data.light !== undefined) {
+        el("light").textContent = data.light;
+        el("lightBar").style.width = Math.min((data.light / 4000) * 100, 100) + "%";
+      }
+      if (data.fire !== undefined) {
+        const fireEl = el("fire");
+        const fireStatus = el("fireStatus");
+        if (data.fire) {
+          fireEl.textContent = "🔥 Phát hiện lửa!";
+          fireStatus.className = "fire-alert danger";
+        } else {
+          fireEl.textContent = "✅ An toàn";
+          fireStatus.className = "fire-alert safe";
+        }
+      }
+    }
+
+    function updateDeviceStates(data) {
+      // Cập nhật trạng thái từ ESP32
+      Object.keys(data).forEach(device => {
+        if (deviceStates.hasOwnProperty(device)) {
+          deviceStates[device] = data[device];
+          updateButtonState(device, data[device]);
+        }
+      });
+    }
+
+    function updateButtonState(device, isOn) {
+      const btn = el(device);
+      const stateEl = el(device + "State");
+      
+      if (isOn) {
+        btn.classList.add("active");
+        stateEl.textContent = "ON";
+      } else {
+        btn.classList.remove("active");
+        stateEl.textContent = "OFF";
+      }
+    }
+
+    client.on("close", () => {
+      connected = false;
+      el("connStatus").textContent = "🔴 Mất kết nối MQTT";
+      el("connStatus").className = "status offline";
+    });
+
+    function sendCommand(cmd, value = true) {
+      if (!connected) return alert("⚠️ Chưa kết nối MQTT!");
+      
+      // Toggle trạng thái
+      deviceStates[cmd] = !deviceStates[cmd];
+      updateButtonState(cmd, deviceStates[cmd]);
+      
+      const payload = JSON.stringify({ cmd, value: deviceStates[cmd] });
+      client.publish("esp32/control", payload);
+      console.log("📤 Sent:", payload);
+    }
+
+    ["red", "green", "yellow", "buzzer", "auto"].forEach((id) => {
+      el(id).addEventListener("click", () => sendCommand(id));
+    });
+
+    el("saveThreshold").addEventListener("click", () => {
+      const data = {
+        cmd: "threshold",
+        temp: parseFloat(el("tempTh").value),
+        hum: parseFloat(el("humTh").value),
+        light: parseFloat(el("lightTh").value),
+      };
+      client.publish("esp32/control", JSON.stringify(data));
+      console.log("📤 Updated thresholds:", data);
+      
+      const btn = el("saveThreshold");
+      btn.textContent = "✅ Đã lưu!";
+      setTimeout(() => {
+        btn.textContent = "💾 Cập nhật Ngưỡng";
+      }, 2000);
+    });
+  </script>
+</body>
 </html>
